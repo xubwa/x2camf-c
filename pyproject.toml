@@ -1,0 +1,49 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "x2camf"
+version = "1.0.0"
+description = "Atomic mean-field spin-orbit integrals for X2C Hamiltonians (C99 implementation, ctypes binding)"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = ["numpy"]
+authors = [{ name = "Chaoqun Zhang" }, { name = "Xubo Wang" }]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: C",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+[project.optional-dependencies]
+pyscf = ["pyscf"]
+
+[project.urls]
+"C++ X2CAMF" = "https://github.com/Warlocat/x2camf"
+
+[tool.scikit-build]
+# the library is loaded through ctypes: one wheel per platform, any Python 3
+wheel.py-api = "py3"
+wheel.packages = ["python/x2camf"]
+cmake.build-type = "Release"
+sdist.exclude = ["build", ".github"]
+
+[tool.cibuildwheel]
+build = "cp312-*"
+skip = "*-musllinux_*"
+test-requires = ["numpy"]
+test-command = "python {project}/tests/test_smoke.py"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+before-all = "yum install -y epel-release && yum install -y openblas-devel"
+environment = { CMAKE_ARGS = "-DBLA_VENDOR=OpenBLAS" }
+
+[tool.cibuildwheel.macos]
+# Accelerate provides BLAS/LAPACK; OpenMP from Homebrew libomp
+before-all = "brew install libomp"
+environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)" }

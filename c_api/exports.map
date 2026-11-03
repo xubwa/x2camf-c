@@ -1,0 +1,4 @@
+{
+  global: x2camf_*;
+  local: *;
+};

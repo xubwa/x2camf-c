@@ -1,0 +1,7 @@
+x2camf-c
+Copyright (c) Chaoqun Zhang and the X2CAMF contributors
+Copyright (c) 2026 Xubo Wang
+
+This product is a C99 translation of the computational core of X2CAMF
+(https://github.com/Warlocat/x2camf), licensed under the Apache License,
+Version 2.0.  Each file in csrc/ names the C++ source it was translated from.
