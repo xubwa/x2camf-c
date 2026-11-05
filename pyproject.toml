@@ -34,7 +34,9 @@ sdist.exclude = ["build", ".github"]
 
 [tool.cibuildwheel]
 build = "cp312-*"
-skip = "*-musllinux_*"
+# no musllinux, no 32-bit Linux (numpy has no i686 wheels any more, and the
+# default i686 image is manylinux2014, without dnf)
+skip = "*-musllinux_* *_i686"
 test-requires = ["numpy"]
 # run from cibuildwheel's empty cwd: test_smoke.py puts ../python (the source
 # tree, no compiled library) first on sys.path, which would shadow the wheel
