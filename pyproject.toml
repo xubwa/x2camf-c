@@ -53,6 +53,6 @@ environment = { CMAKE_ARGS = "-DBLA_VENDOR=OpenBLAS" }
 [tool.cibuildwheel.macos]
 # Accelerate provides BLAS/LAPACK; OpenMP from Homebrew libomp
 before-all = "brew install libomp"
-# Homebrew's libomp is built for the runner's macOS (14): delocate refuses to
+# Homebrew's libomp is built for the runner's macOS (15): delocate refuses to
 # bundle it into a wheel that claims an older deployment target
-environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)", MACOSX_DEPLOYMENT_TARGET = "14.0" }
+environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)", MACOSX_DEPLOYMENT_TARGET = "15.0" }
