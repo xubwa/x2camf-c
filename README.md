@@ -5,7 +5,12 @@ Hamiltonians, and the spherical atomic Dirac-Hartree-Fock behind them.
 This is a C99 translation of the computational core of the C++
 [X2CAMF](https://github.com/Warlocat/x2camf) code, line by line
 (`csrc/TRANSLATION_CONVENTIONS.md`), with results equal to the C++/Eigen
-implementation to SCF convergence.  It links only BLAS/LAPACK, libm and
+implementation to SCF convergence.  One deliberate difference: in the
+average-of-configuration (`aoc`) 4-component SCF the open-shell coupling
+operator also treats the negative-energy orbitals as virtual, which makes a
+single open-shell electron exact with the Gaunt term (the C++ code leaves a
+small self-interaction there).  AMF integrals of open-shell atoms change at
+the 1e-8..1e-10 relative level.  It links only BLAS/LAPACK, libm and
 (optionally) OpenMP: no C++ runtime, Eigen or pybind11.
 
 ```python

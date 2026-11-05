@@ -242,6 +242,46 @@ static mat_t evaluateDensity_aoc(mat_t coeff_, vecd_t occNumber_, bool twoC)
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Density of the virtual space used in the open-shell coupling         */
+/* operator (R(NOpenShells+1) of ca_evaluateFock).  occNumber_ marks    */
+/* the unoccupied positive-energy orbitals.  In the 4-component case    */
+/* the negative-energy orbitals are virtual as well: without them the   */
+/* self-term of an open shell keeps its coupling to the negative-energy */
+/* space, so e.g. a single 1s electron with the Gaunt term is not       */
+/* one-electron exact.  (The C++ X2CAMF uses the positive-energy        */
+/* virtuals only.)                                                      */
+/* ------------------------------------------------------------------ */
+static mat_t evaluateDensity_virtual(mat_t coeff_, vecd_t occNumber_,
+                                     bool twoC)
+{
+    mat_t den = evaluateDensity_aoc(coeff_, occNumber_, twoC);
+    if (!twoC)
+    {
+        int size = coeff_.cols / 2;
+        for (int aa = 0; aa < 2 * size; aa++)
+            for (int bb = 0; bb < 2 * size; bb++)
+            {
+                double s = 0.0;
+                for (int ii = 0; ii < size; ii++)
+                    s += M(coeff_, aa, ii) * M(coeff_, bb, ii);
+                M(den, aa, bb) += s;
+            }
+    }
+    return den;
+}
+
+/* CA shell density ii: the virtual shell (ii == NOpenShells + 1) includes
+   the negative-energy orbitals, see evaluateDensity_virtual. */
+static mat_t ca_shell_density(DHF_CA_EXT* ca, int ii, mat_t coeff_, int ir,
+                              bool twoC)
+{
+    if (ii == ca->NOpenShells + 1)
+        return evaluateDensity_virtual(coeff_, ca->occNumberShells[ii].v[ir],
+                                       twoC);
+    return evaluateDensity_aoc(coeff_, ca->occNumberShells[ii].v[ir], twoC);
+}
+
 /* forward declarations for the CA Fock / energy helpers */
 static void ca_evaluateFock(DHF_SPH* self, mat_t* fock_c, bool twoC,
                             const vmat_t* densities, int ndens, int size,
@@ -326,18 +366,16 @@ void dhf_sph_ca_run_scf(DHF_SPH* self, bool twoC, bool renormSmall)
     {
         for (int ii = 0; ii < NOpenShells + 2; ii++)
             mat_assign(&densityShells[ii].m[ir],
-                       evaluateDensity_aoc(self->coeff.m[ir],
-                                           ca->occNumberShells[ii].v[ir],
-                                           twoC));
+                       ca_shell_density(ca, ii, self->coeff.m[ir], ir,
+                                        twoC));
     }
     for (int ir = occMax_irrep; ir < self->Nirrep;
          ir += self->irrep_list[ir].two_j + 1)
     {
         /* WORNG */
         mat_assign(&densityShells[NOpenShells + 1].m[ir],
-                   evaluateDensity_aoc(
-                       self->coeff.m[ir],
-                       ca->occNumberShells[NOpenShells + 1].v[ir], twoC));
+                   ca_shell_density(ca, NOpenShells + 1, self->coeff.m[ir],
+                                    ir, twoC));
     }
 
     for (int iter = 1; iter <= self->maxIter; iter++)
@@ -410,19 +448,16 @@ void dhf_sph_ca_run_scf(DHF_SPH* self, bool twoC, bool renormSmall)
         {
             for (int ii = 0; ii < NOpenShells + 2; ii++)
                 mat_assign(&newDensityShells[ii].m[ir],
-                           evaluateDensity_aoc(
-                               self->coeff.m[ir],
-                               ca->occNumberShells[ii].v[ir], twoC));
+                           ca_shell_density(ca, ii, self->coeff.m[ir], ir,
+                                            twoC));
         }
         for (int ir = occMax_irrep; ir < self->Nirrep;
              ir += self->irrep_list[ir].two_j + 1)
         {
             /* WORNG */
             mat_assign(&newDensityShells[NOpenShells + 1].m[ir],
-                       evaluateDensity_aoc(
-                           self->coeff.m[ir],
-                           ca->occNumberShells[NOpenShells + 1].v[ir],
-                           twoC));
+                       ca_shell_density(ca, NOpenShells + 1,
+                                        self->coeff.m[ir], ir, twoC));
         }
         self->d_density = 0.0;
         for (int ii = 0; ii < NOpenShells + 1; ii++)
@@ -483,9 +518,8 @@ void dhf_sph_ca_run_scf(DHF_SPH* self, bool twoC, bool renormSmall)
             for (int ii = 0; ii < NOpenShells + 2; ii++)
             {
                 mat_assign(&newDensityShells[ii].m[ir],
-                           evaluateDensity_aoc(
-                               self->coeff.m[ir],
-                               ca->occNumberShells[ii].v[ir], twoC));
+                           ca_shell_density(ca, ii, self->coeff.m[ir], ir,
+                                            twoC));
                 /* error4DIIS(ir,ii).push_back(
                        evaluateErrorDIIS(densityShells(ii)(ir),
                                          newDensityShells(ii)(ir))); */
