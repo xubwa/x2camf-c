@@ -51,8 +51,7 @@ before-all = "dnf install -y --enablerepo=powertools openblas-devel"
 environment = { CMAKE_ARGS = "-DBLA_VENDOR=OpenBLAS" }
 
 [tool.cibuildwheel.macos]
-# Accelerate provides BLAS/LAPACK; OpenMP from Homebrew libomp
-before-all = "brew install libomp"
-# Homebrew's libomp is built for the runner's macOS (15): delocate refuses to
-# bundle it into a wheel that claims an older deployment target
-environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)", MACOSX_DEPLOYMENT_TARGET = "15.0" }
+# Accelerate provides BLAS/LAPACK.  No OpenMP on macOS (as in pyscf's wheels):
+# Apple clang has none, and a bundled libomp would force the deployment target
+# to the runner's macOS and clash with other packages' libomp copies.
+environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DENABLE_OPENMP=OFF", MACOSX_DEPLOYMENT_TARGET = "11.0" }

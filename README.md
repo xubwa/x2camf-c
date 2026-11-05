@@ -30,7 +30,8 @@ platform serves every Python 3 version.  Its C API is `c_api/x2camf_c.h`
 
 ## BLAS/LAPACK
 
-The PyPI wheels carry OpenBLAS (Linux) or use Accelerate (macOS).  For
+The PyPI wheels carry OpenBLAS and OpenMP (Linux) or use Accelerate
+without OpenMP (macOS 11 or newer; the C code then runs on one thread).  For
 another library build from source; the CMake options are those of pyscf:
 
 ```bash
