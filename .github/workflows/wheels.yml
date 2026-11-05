@@ -31,8 +31,9 @@ jobs:
           name: sdist
           path: dist/*.tar.gz
 
-  publish:
-    # trusted publishing: register this repository and workflow on (Test)PyPI first
+  publish-testpypi:
+    # trusted publishing: the (Test)PyPI publisher is registered for
+    # repository xubwa/x2camf-c, workflow wheels.yml, environment pypi
     needs: [wheels, sdist]
     runs-on: ubuntu-latest
     environment: pypi
@@ -46,3 +47,19 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          # a re-run of the same tag must not fail on files already there
+          skip-existing: true
+
+  publish-pypi:
+    # only after the same files went to TestPyPI
+    needs: [publish-testpypi]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
