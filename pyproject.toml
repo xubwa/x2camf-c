@@ -22,6 +22,7 @@ classifiers = [
 pyscf = ["pyscf"]
 
 [project.urls]
+Repository = "https://github.com/xubwa/x2camf-c"
 "C++ X2CAMF" = "https://github.com/Warlocat/x2camf"
 
 [tool.scikit-build]
@@ -38,12 +39,16 @@ test-requires = ["numpy"]
 test-command = "python {project}/tests/test_smoke.py"
 
 [tool.cibuildwheel.linux]
-manylinux-x86_64-image = "manylinux2014"
-manylinux-aarch64-image = "manylinux2014"
-before-all = "yum install -y epel-release && yum install -y openblas-devel"
+# manylinux_2_28 (AlmaLinux 8, glibc >= 2.28): numpy >= 2.3 has no older wheels
+# either; openblas-devel lives in the powertools repository there
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "dnf install -y --enablerepo=powertools openblas-devel"
 environment = { CMAKE_ARGS = "-DBLA_VENDOR=OpenBLAS" }
 
 [tool.cibuildwheel.macos]
 # Accelerate provides BLAS/LAPACK; OpenMP from Homebrew libomp
 before-all = "brew install libomp"
-environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)" }
+# Homebrew's libomp is built for the runner's macOS (14): delocate refuses to
+# bundle it into a wheel that claims an older deployment target
+environment = { CMAKE_ARGS = "-DBLA_VENDOR=Apple -DOpenMP_ROOT=$(brew --prefix libomp)", MACOSX_DEPLOYMENT_TARGET = "14.0" }
