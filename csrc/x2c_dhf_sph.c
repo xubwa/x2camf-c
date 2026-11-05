@@ -389,6 +389,7 @@ void dhf_sph_free(DHF_SPH* self)
         free(ca->NN_list);
         free(ca->MM_list);
         free(ca->f_list);
+        free(ca->shell_irrep);
         if (ca->occNumberShells != NULL)
         {
             for (int ii = 0; ii < ca->n_occShells; ii++)

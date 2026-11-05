@@ -43,6 +43,8 @@ typedef struct
     /* std::vector<double> NN_list, MM_list, f_list (length NOpenShells) */
     int n_shells; /* == NOpenShells */
     double *NN_list, *MM_list, *f_list;
+    /* first irrep (of its 2j+1 components) of each open shell */
+    int* shell_irrep;
     /* vector<vVectorXd> occNumberShells (length NOpenShells + 2) */
     int n_occShells;
     vvecd_t* occNumberShells;

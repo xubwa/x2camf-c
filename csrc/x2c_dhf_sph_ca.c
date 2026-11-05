@@ -37,46 +37,56 @@ DHF_SPH* dhf_sph_ca_new(INT_SPH* int_sph, const char* filename,
     DHF_CA_EXT* ca = (DHF_CA_EXT*)calloc(1, sizeof(DHF_CA_EXT));
     self->ca = ca;
 
-    /* vector<int> openIrreps; */
-    int* openIrreps = (int*)malloc((size_t)self->occMax_irrep * sizeof(int));
-    int NopenIrreps = 0;
-
-    /* for(int ir = 0; ir < occMax_irrep; ir+=irrep_list(ir).two_j+1) */
+    /* Open shells.  Every fractionally occupied orbital is an open shell of
+       its own (M = 2j+1 spinors, N = f M electrons).  The C++ code made one
+       shell per irrep, so two fractional orbitals of the same irrep (e.g.
+       1s^1 2s^1) were merged into one shell without interaction between
+       them; with one fractional orbital per irrep the two agree. */
+    int NOpenShells = 0;
     for (int ir = 0; ir < self->occMax_irrep;
          ir += self->irrep_list[ir].two_j + 1)
-    {
         for (int ii = 0; ii < self->occNumber.v[ir].n; ii++)
         {
-            /* if 1 > occNumber(ir)(ii) > 0 */
-            if (fabs(self->occNumber.v[ir].d[ii]) > 1e-4 &&
-                self->occNumber.v[ir].d[ii] < 0.9999)
-            {
-                openIrreps[NopenIrreps] = ir;
-                NopenIrreps++;
-                break;
-            }
+            double occ = self->occNumber.v[ir].d[ii];
+            if (fabs(occ) > 1e-4 && occ < 0.9999) NOpenShells++;
         }
-    }
-    int NOpenShells = NopenIrreps;
     ca->NOpenShells = NOpenShells;
     ca->n_shells = NOpenShells;
-
-    /* occNumberShells.resize(NOpenShells+2); */
     ca->n_occShells = NOpenShells + 2;
     ca->occNumberShells =
         (vvecd_t*)calloc((size_t)ca->n_occShells, sizeof(vvecd_t));
-
-    /* MM_list / NN_list / f_list grow with push_back; allocate to max len */
-    ca->MM_list = (double*)malloc((size_t)NOpenShells * sizeof(double));
-    ca->NN_list = (double*)malloc((size_t)NOpenShells * sizeof(double));
-    ca->f_list = (double*)malloc((size_t)NOpenShells * sizeof(double));
-    int MM_size = 0, NN_size = 0, f_size = 0;
-
-    for (int ii = 0; ii < NOpenShells; ii++)
+    size_t nsh = NOpenShells > 0 ? (size_t)NOpenShells : 1;
+    ca->MM_list = (double*)malloc(nsh * sizeof(double));
+    ca->NN_list = (double*)malloc(nsh * sizeof(double));
+    ca->f_list = (double*)malloc(nsh * sizeof(double));
+    ca->shell_irrep = (int*)malloc(nsh * sizeof(int));
+    /* shell_of[ir][ii]: 1-based open shell of orbital ii of irrep ir, 0 if
+       closed or empty (all 2j+1 components of an irrep share it) */
+    int** shell_of = (int**)calloc(
+        (size_t)(self->occMax_irrep > 0 ? self->occMax_irrep : 1), sizeof(int*));
     {
-        /* MM_list.push_back(irrep_list(openIrreps[ii]).two_j+1); */
-        ca->MM_list[MM_size] = self->irrep_list[openIrreps[ii]].two_j + 1;
-        MM_size++;
+        int s = 0;
+        for (int ir = 0; ir < self->occMax_irrep;
+             ir += self->irrep_list[ir].two_j + 1)
+        {
+            int ncomp = self->irrep_list[ir].two_j + 1;
+            int n = self->occNumber.v[ir].n;
+            int* map = (int*)calloc((size_t)(n > 0 ? n : 1), sizeof(int));
+            for (int ii = 0; ii < n; ii++)
+            {
+                double occ = self->occNumber.v[ir].d[ii];
+                if (fabs(occ) > 1e-4 && occ < 0.9999)
+                {
+                    ca->f_list[s] = occ;
+                    ca->MM_list[s] = ncomp;
+                    ca->NN_list[s] = occ * ncomp;
+                    ca->shell_irrep[s] = ir;
+                    map[ii] = ++s;
+                }
+            }
+            for (int jj = 0; jj < ncomp && ir + jj < self->occMax_irrep; jj++)
+                shell_of[ir + jj] = map; /* shared, freed once below */
+        }
     }
 
     /* occNumberShells[0] = occNumber; (deep copy) */
@@ -92,11 +102,8 @@ DHF_SPH* dhf_sph_ca_new(INT_SPH* int_sph, const char* filename,
                     self->occNumber.v[ir].d[jj];
         }
     }
-    /* for(int ii = 1; ii < occNumberShells.size()-1; ii++)
-           occNumberShells[ii].resize(occMax_irrep); */
     for (int ii = 1; ii < ca->n_occShells - 1; ii++)
         ca->occNumberShells[ii] = vvecd_new(self->occMax_irrep);
-    /* occNumberShells[NOpenShells+1].resize(irrep_list.rows()); */
     ca->occNumberShells[NOpenShells + 1] = vvecd_new(self->Nirrep);
 
     for (int ir = 0; ir < self->occMax_irrep; ir++)
@@ -118,28 +125,20 @@ DHF_SPH* dhf_sph_ca_new(INT_SPH* int_sph, const char* filename,
         {
             if (fabs(self->occNumber.v[ir].d[ii]) > 1e-4)
             {
-                /* if 1 > occNumber(ir)(ii) > 0 */
-                if (self->occNumber.v[ir].d[ii] < 0.9999)
+                int sh = shell_of[ir] ? shell_of[ir][ii] : 0;
+                if (sh > 0)
                 {
-                    if (f_size < NopenIrreps)
-                    {
-                        if (ir == openIrreps[f_size])
-                        {
-                            ca->f_list[f_size] = self->occNumber.v[ir].d[ii];
-                            f_size++;
-                            ca->NN_list[NN_size] =
-                                ca->f_list[f_size - 1] *
-                                ca->MM_list[f_size - 1];
-                            NN_size++;
-                        }
-                    }
                     ca->occNumberShells[0].v[ir].d[ii] = 0.0;
-                    ca->occNumberShells[f_size].v[ir].d[ii] = 1.0;
+                    ca->occNumberShells[sh].v[ir].d[ii] = 1.0;
                 }
                 ca->occNumberShells[NOpenShells + 1].v[ir].d[ii] = 0.0;
             }
         }
     }
+    for (int ir = 0; ir < self->occMax_irrep;
+         ir += self->irrep_list[ir].two_j + 1)
+        free(shell_of[ir]);
+    free(shell_of);
     for (int ir = self->occMax_irrep; ir < self->Nirrep; ir++)
     {
         vecd_free(&ca->occNumberShells[NOpenShells + 1].v[ir]);
@@ -189,7 +188,6 @@ DHF_SPH* dhf_sph_ca_new(INT_SPH* int_sph, const char* filename,
         }
     }
 
-    free(openIrreps);
     return self;
 }
 
@@ -785,6 +783,49 @@ static void ca_evaluateFock(DHF_SPH* self, mat_t* fock_c, bool twoC,
         mat_free(&t2);
         mat_free(&t3);
         mat_free(&t4);
+    }
+    /* Rotations between two open shells u < v of the same irrep (possible
+       only since every fractional orbital is its own shell) are frozen: the
+       uv block of the effective Fock is set to zero, so the orbitals keep
+       their identity and the energy is stationary with respect to all other
+       rotations.  Letting them rotate makes e.g. 1s^1 2s^1 mix 1s and 2s
+       towards the lower configurations (the 1s^2-like collapse that also
+       stops GRASP and MCDFGME for the J=0 state): for He-like Pb the
+       interaction energy dropped from 19.52 to 18.37 Eh and the screened
+       self-energy of the 1s2s pair moved away from the rigorous value. */
+    {
+        bool any = false;
+        for (int uu = 1; uu < NOpenShells + 1 && !any; uu++)
+            for (int vv = uu + 1; vv < NOpenShells + 1; vv++)
+                if (ca->shell_irrep[uu - 1] == Iirrep &&
+                    ca->shell_irrep[vv - 1] == Iirrep)
+                {
+                    any = true;
+                    break;
+                }
+        if (any)
+        {
+            mat_t F0 = mat_clone(*fock_c); /* h + Q0 + sum_u f_u Q_u */
+            for (int uu = 1; uu < NOpenShells + 1; uu++)
+            {
+                if (ca->shell_irrep[uu - 1] != Iirrep) continue;
+                for (int vv = uu + 1; vv < NOpenShells + 1; vv++)
+                {
+                    if (ca->shell_irrep[vv - 1] != Iirrep) continue;
+                    /* LM += -S R_u F0 R_v S: cancels the uv block of F0 */
+                    mat_t t1 = mat_mul(S, R.m[uu]);
+                    mat_t t2 = mat_mul(t1, F0);
+                    mat_t t3 = mat_mul(t2, R.m[vv]);
+                    mat_t t4 = mat_mul(t3, S);
+                    mat_add_inplace(LM, t4, -1.0);
+                    mat_free(&t1);
+                    mat_free(&t2);
+                    mat_free(&t3);
+                    mat_free(&t4);
+                }
+            }
+            mat_free(&F0);
+        }
     }
     /* fock_c += LM + LM.adjoint(); */
     mat_t LMt = mat_transpose(LM);
