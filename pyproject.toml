@@ -36,7 +36,9 @@ sdist.exclude = ["build", ".github"]
 build = "cp312-*"
 skip = "*-musllinux_*"
 test-requires = ["numpy"]
-test-command = "python {project}/tests/test_smoke.py"
+# run from cibuildwheel's empty cwd: test_smoke.py puts ../python (the source
+# tree, no compiled library) first on sys.path, which would shadow the wheel
+test-command = "cp {project}/tests/test_smoke.py . && python test_smoke.py"
 
 [tool.cibuildwheel.linux]
 # manylinux_2_28 (AlmaLinux 8, glibc >= 2.28): numpy >= 2.3 has no older wheels
